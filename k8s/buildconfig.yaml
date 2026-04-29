@@ -1,0 +1,33 @@
+---
+apiVersion: build.openshift.io/v1
+kind: BuildConfig
+metadata:
+  name: espn-soccer
+  namespace: n8n
+spec:
+  output:
+    to:
+      kind: ImageStreamTag
+      name: espn-soccer:latest
+  source:
+    type: Dockerfile
+    dockerfile: |
+      FROM node:20-alpine
+      WORKDIR /app
+      RUN npm install --global tsx && \
+          npm install @modelcontextprotocol/sdk@^1.0.4 express@^4.21.2 && \
+          npm cache clean --force
+      COPY server.ts /app/server.ts
+      RUN chown -R 1001:0 /app && chmod -R g=u /app
+      USER 1001
+      EXPOSE 8080
+      ENV PORT=8080 NODE_ENV=production
+      CMD ["tsx", "/app/server.ts"]
+    configMaps:
+      - configMap:
+          name: espn-soccer-server
+        destinationDir: "."
+  strategy:
+    type: Docker
+  triggers:
+  - type: ConfigChange

@@ -1,0 +1,19 @@
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: espn-soccer
+  namespace: n8n
+  labels:
+    app: espn-soccer
+spec:
+  port:
+    targetPort: http
+  tls:
+    insecureEdgeTerminationPolicy: Allow
+    termination: edge
+  to:
+    kind: Service
+    name: espn-soccer
+    weight: 100
+  wildcardPolicy: None
