@@ -1,10 +1,10 @@
 # ESPN Soccer MCP Server
 
-Model Context Protocol (MCP) server for accessing ESPN's hidden API for European soccer leagues.
+Model Context Protocol (MCP) server for accessing ESPN's hidden API for soccer leagues and tournaments.
 
 ## Features
 
-Access to top European soccer leagues:
+Access to top soccer leagues and international tournaments:
 - **Premier League** (England)
 - **La Liga** (Spain)
 - **Bundesliga** (Germany)
@@ -12,11 +12,12 @@ Access to top European soccer leagues:
 - **Ligue 1** (France)
 - **Champions League** (UEFA)
 - **Europa League** (UEFA)
+- **FIFA World Cup**
 
 ## Available Tools
 
 ### 1. list-leagues
-List all available European soccer leagues.
+List all available soccer leagues and tournaments.
 
 ```json
 {
@@ -91,7 +92,7 @@ Get latest news for a league.
 
 ## League Identifiers
 
-| League | ID | ESPN Code |
+| League/Tournament | ID | ESPN Code |
 |--------|----|-----------| 
 | Premier League | `premier-league` | `eng.1` |
 | La Liga | `la-liga` | `esp.1` |
@@ -100,6 +101,7 @@ Get latest news for a league.
 | Ligue 1 | `ligue-1` | `fra.1` |
 | Champions League | `champions-league` | `uefa.champions` |
 | Europa League | `europa-league` | `uefa.europa` |
+| FIFA World Cup | `world-cup` | `fifa.world` |
 
 ## Deployment
 
@@ -107,7 +109,7 @@ Deployed to OpenShift in the `n8n` namespace:
 
 - **URL**: `https://your-server.example.com/mcp`
 - **Health Check**: `https://your-server.example.com/health`
-- **Replicas**: 2 pods for high availability
+- **Replicas**: 1 pod
 
 ### Deploy to OpenShift
 
@@ -168,7 +170,8 @@ Add as an MCP Client tool in your n8n workflow:
 Example use cases:
 - "What are today's Premier League fixtures?"
 - "Get me the latest Champions League scores"
-- "Show me news about La Liga"
+- "Show me World Cup standings"
+- "Get news about La Liga"
 
 ## Architecture
 

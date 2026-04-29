@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * ESPN Soccer MCP Server
- * Provides access to ESPN's hidden API for European soccer leagues
+ * Provides access to ESPN's hidden API for soccer league or tournaments
  */
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
@@ -11,7 +11,7 @@ import type { CallToolResult, TextContent } from '@modelcontextprotocol/sdk/type
 import express from 'express';
 import crypto from 'crypto';
 
-// European Soccer Leagues
+// Soccer Leagues and Tournaments
 const LEAGUES = {
   'premier-league': { id: 'eng.1', name: 'English Premier League' },
   'la-liga': { id: 'esp.1', name: 'Spanish La Liga' },
@@ -20,12 +20,13 @@ const LEAGUES = {
   'ligue-1': { id: 'fra.1', name: 'French Ligue 1' },
   'champions-league': { id: 'uefa.champions', name: 'UEFA Champions League' },
   'europa-league': { id: 'uefa.europa', name: 'UEFA Europa League' },
+  'world-cup': { id: 'fifa.world', name: 'FIFA World Cup' },
 };
 
 const tools = [
   {
     name: 'get-scoreboard',
-    description: 'Get current scores and fixtures for a European soccer league. Returns live scores, upcoming matches, and recent results.',
+    description: 'Get current scores and fixtures for a soccer league or tournament. Returns live scores, upcoming matches, and recent results.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -67,7 +68,7 @@ const tools = [
   },
   {
     name: 'get-league-news',
-    description: 'Get latest news for a European soccer league.',
+    description: 'Get latest news for a soccer league or tournament.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -105,7 +106,7 @@ const tools = [
   },
   {
     name: 'get-teams',
-    description: 'Get all teams in a European soccer league.',
+    description: 'Get all teams in a soccer league or tournament.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -120,7 +121,7 @@ const tools = [
   },
   {
     name: 'list-leagues',
-    description: 'List all available European soccer leagues.',
+    description: 'List all available soccer leagues and tournaments.',
     inputSchema: {
       type: 'object',
       properties: {},
@@ -286,7 +287,7 @@ async function getStandings(league: string): Promise<any> {
   const leagueInfo = LEAGUES[league as keyof typeof LEAGUES];
   if (!leagueInfo) throw new Error(`Unknown league: ${league}`);
 
-  const path = `/apis/site/v2/sports/soccer/${leagueInfo.id}/standings`;
+  const path = `/apis/v2/sports/soccer/${leagueInfo.id}/standings`;
   const data = await fetchESPN(path);
 
   return {
