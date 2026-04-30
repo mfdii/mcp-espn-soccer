@@ -26,7 +26,7 @@ const LEAGUES = {
 const tools = [
   {
     name: 'get-scoreboard',
-    description: 'Get current scores and fixtures for a soccer league or tournament. Returns live scores, upcoming matches, and recent results.',
+    description: 'Get current scores and fixtures for a soccer league or tournament. Returns live scores, upcoming matches, recent results, TV broadcast channels, and betting odds (over/under for match excitement assessment).',
     inputSchema: {
       type: 'object',
       properties: {
@@ -87,7 +87,7 @@ const tools = [
   },
   {
     name: 'get-team-info',
-    description: 'Get information about a specific team in a league.',
+    description: 'Get information about a specific team including upcoming fixtures and team metadata. Returns next scheduled match(es) with dates, opponents, and venues.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -98,7 +98,11 @@ const tools = [
         },
         teamId: {
           type: 'string',
-          description: 'Team ID',
+          description: 'Team ID or team name (e.g., "359" or "Arsenal")',
+        },
+        limit: {
+          type: 'number',
+          description: 'Maximum number of upcoming fixtures to return (default: 5, max: 10)',
         },
       },
       required: ['league', 'teamId'],
@@ -169,25 +173,38 @@ async function getScoreboard(league: string, date?: string, limit: number = 10):
   return {
     league: leagueInfo.name,
     leagueId: leagueInfo.id,
-    events: data.events?.slice(0, maxLimit).map((event: any) => ({
-      id: event.id,
-      name: event.name,
-      shortName: event.shortName,
-      date: event.date,
-      status: event.status.type.description,
-      state: event.status.type.state,
-      venue: event.competitions?.[0]?.venue?.fullName,
-      homeTeam: {
-        id: event.competitions?.[0]?.competitors?.find((c: any) => c.homeAway === 'home')?.id,
-        name: event.competitions?.[0]?.competitors?.find((c: any) => c.homeAway === 'home')?.team?.displayName,
-        score: event.competitions?.[0]?.competitors?.find((c: any) => c.homeAway === 'home')?.score,
-      },
-      awayTeam: {
-        id: event.competitions?.[0]?.competitors?.find((c: any) => c.homeAway === 'away')?.id,
-        name: event.competitions?.[0]?.competitors?.find((c: any) => c.homeAway === 'away')?.team?.displayName,
-        score: event.competitions?.[0]?.competitors?.find((c: any) => c.homeAway === 'away')?.score,
-      },
-    })) || [],
+    events: data.events?.slice(0, maxLimit).map((event: any) => {
+      const competition = event.competitions?.[0];
+      const odds = competition?.odds?.[0];
+
+      return {
+        id: event.id,
+        name: event.name,
+        shortName: event.shortName,
+        date: event.date,
+        status: event.status.type.description,
+        state: event.status.type.state,
+        venue: competition?.venue?.fullName,
+        broadcasts: competition?.broadcasts
+          ?.map((b: any) => b.names)
+          .flat()
+          .filter(Boolean) || [],
+        matchOdds: odds ? {
+          overUnder: odds.overUnder,
+          favorite: odds.details,
+        } : null,
+        homeTeam: {
+          id: competition?.competitors?.find((c: any) => c.homeAway === 'home')?.id,
+          name: competition?.competitors?.find((c: any) => c.homeAway === 'home')?.team?.displayName,
+          score: competition?.competitors?.find((c: any) => c.homeAway === 'home')?.score,
+        },
+        awayTeam: {
+          id: competition?.competitors?.find((c: any) => c.homeAway === 'away')?.id,
+          name: competition?.competitors?.find((c: any) => c.homeAway === 'away')?.team?.displayName,
+          score: competition?.competitors?.find((c: any) => c.homeAway === 'away')?.score,
+        },
+      };
+    }) || [],
     totalEvents: data.events?.length || 0,
     showing: Math.min(data.events?.length || 0, maxLimit),
   };
@@ -244,12 +261,31 @@ async function getLeagueNews(league: string, limit: number = 5): Promise<any> {
   };
 }
 
-async function getTeamInfo(league: string, teamId: string): Promise<any> {
+async function getTeamInfo(league: string, teamId: string, limit: number = 5): Promise<any> {
   const leagueInfo = LEAGUES[league as keyof typeof LEAGUES];
   if (!leagueInfo) throw new Error(`Unknown league: ${league}`);
 
   const path = `/apis/site/v2/sports/soccer/${leagueInfo.id}/teams/${teamId}`;
   const data = await fetchESPN(path);
+
+  // Extract upcoming fixtures from nextEvent, limited to specified count
+  const maxLimit = Math.min(limit, 10); // Cap at 10 matches
+  const upcomingFixtures = data.team?.nextEvent?.slice(0, maxLimit).map((event: any) => ({
+    id: event.id,
+    name: event.name,
+    shortName: event.shortName,
+    date: event.date,
+    status: event.competitions?.[0]?.status?.type?.description,
+    homeTeam: {
+      id: event.competitions?.[0]?.competitors?.find((c: any) => c.homeAway === 'home')?.team?.id,
+      name: event.competitions?.[0]?.competitors?.find((c: any) => c.homeAway === 'home')?.team?.displayName,
+    },
+    awayTeam: {
+      id: event.competitions?.[0]?.competitors?.find((c: any) => c.homeAway === 'away')?.team?.id,
+      name: event.competitions?.[0]?.competitors?.find((c: any) => c.homeAway === 'away')?.team?.displayName,
+    },
+    venue: event.competitions?.[0]?.venue?.fullName,
+  })) || [];
 
   return {
     team: {
@@ -261,6 +297,7 @@ async function getTeamInfo(league: string, teamId: string): Promise<any> {
       logos: data.team?.logos?.map((l: any) => l.href),
       standingSummary: data.team?.standingSummary,
     },
+    upcomingFixtures,
   };
 }
 
@@ -349,7 +386,7 @@ class ESPNSoccerMCPServer {
             result = await getLeagueNews(args!.league, args?.limit);
             break;
           case 'get-team-info':
-            result = await getTeamInfo(args!.league, args!.teamId);
+            result = await getTeamInfo(args!.league, args!.teamId, args?.limit);
             break;
           case 'get-teams':
             result = await getTeams(args!.league);

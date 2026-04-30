@@ -27,17 +27,26 @@ List all available soccer leagues and tournaments.
 ```
 
 ### 2. get-scoreboard
-Get current scores and fixtures for a league.
+Get current scores and fixtures for a league, including TV broadcast channels and betting odds.
 
 ```json
 {
   "name": "get-scoreboard",
   "arguments": {
     "league": "premier-league",
-    "date": "20260427"  // Optional: YYYYMMDD format
+    "date": "20260427",  // Optional: YYYYMMDD format
+    "limit": 10          // Optional: Max matches to return (default: 10, max: 20)
   }
 }
 ```
+
+**Response includes:**
+- Match details (teams, scores, date, venue)
+- **Broadcast channels** (e.g., `["NBC Sports", "Peacock"]`) - where to watch
+- **Match odds** (over/under and favorite) - for assessing match excitement
+  - `overUnder > 3.5` → High-scoring match expected
+  - `overUnder < 2.5` → Defensive battle expected
+  - Close odds → Evenly matched teams
 
 ### 3. get-teams
 Get all teams in a league.
