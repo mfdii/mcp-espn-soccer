@@ -87,7 +87,7 @@ const tools = [
   },
   {
     name: 'get-team-info',
-    description: 'Get information about a specific team including upcoming fixtures and team metadata. Returns next scheduled match(es) with dates, opponents, and venues.',
+    description: 'Get information about a specific team including upcoming fixtures and team metadata. Returns next scheduled matches with dates, opponents, venues, and broadcast channels.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -265,37 +265,73 @@ async function getTeamInfo(league: string, teamId: string, limit: number = 5): P
   const leagueInfo = LEAGUES[league as keyof typeof LEAGUES];
   if (!leagueInfo) throw new Error(`Unknown league: ${league}`);
 
-  const path = `/apis/site/v2/sports/soccer/${leagueInfo.id}/teams/${teamId}`;
-  const data = await fetchESPN(path);
+  // Get team metadata
+  const teamPath = `/apis/site/v2/sports/soccer/${leagueInfo.id}/teams/${teamId}`;
+  const teamData = await fetchESPN(teamPath);
 
-  // Extract upcoming fixtures from nextEvent, limited to specified count
+  // Build upcoming fixtures by fetching scoreboards for future days
   const maxLimit = Math.min(limit, 10); // Cap at 10 matches
-  const upcomingFixtures = data.team?.nextEvent?.slice(0, maxLimit).map((event: any) => ({
-    id: event.id,
-    name: event.name,
-    shortName: event.shortName,
-    date: event.date,
-    status: event.competitions?.[0]?.status?.type?.description,
-    homeTeam: {
-      id: event.competitions?.[0]?.competitors?.find((c: any) => c.homeAway === 'home')?.team?.id,
-      name: event.competitions?.[0]?.competitors?.find((c: any) => c.homeAway === 'home')?.team?.displayName,
-    },
-    awayTeam: {
-      id: event.competitions?.[0]?.competitors?.find((c: any) => c.homeAway === 'away')?.team?.id,
-      name: event.competitions?.[0]?.competitors?.find((c: any) => c.homeAway === 'away')?.team?.displayName,
-    },
-    venue: event.competitions?.[0]?.venue?.fullName,
-  })) || [];
+  const upcomingFixtures: any[] = [];
+  const today = new Date();
+
+  // Search up to 60 days ahead to cover remaining season fixtures
+  for (let day = 0; day < 60 && upcomingFixtures.length < maxLimit; day++) {
+    const searchDate = new Date(today);
+    searchDate.setDate(today.getDate() + day);
+    const dateStr = searchDate.toISOString().split('T')[0].replace(/-/g, '');
+
+    try {
+      const scoreboardPath = `/apis/site/v2/sports/soccer/${leagueInfo.id}/scoreboard?dates=${dateStr}`;
+      const scoreboardData = await fetchESPN(scoreboardPath);
+
+      // Filter for matches involving this team
+      const teamMatches = scoreboardData.events?.filter((event: any) => {
+        const competition = event.competitions?.[0];
+        const competitors = competition?.competitors || [];
+        return competitors.some((c: any) => c.team?.id === teamId);
+      }) || [];
+
+      // Add matches to upcoming fixtures
+      for (const event of teamMatches) {
+        if (upcomingFixtures.length >= maxLimit) break;
+
+        const competition = event.competitions?.[0];
+        upcomingFixtures.push({
+          id: event.id,
+          name: event.name,
+          shortName: event.shortName,
+          date: event.date,
+          status: event.status?.type?.description,
+          homeTeam: {
+            id: competition?.competitors?.find((c: any) => c.homeAway === 'home')?.team?.id,
+            name: competition?.competitors?.find((c: any) => c.homeAway === 'home')?.team?.displayName,
+          },
+          awayTeam: {
+            id: competition?.competitors?.find((c: any) => c.homeAway === 'away')?.team?.id,
+            name: competition?.competitors?.find((c: any) => c.homeAway === 'away')?.team?.displayName,
+          },
+          venue: competition?.venue?.fullName,
+          broadcasts: competition?.broadcasts
+            ?.map((b: any) => b.names)
+            .flat()
+            .filter(Boolean) || [],
+        });
+      }
+    } catch (error) {
+      // Continue to next week if this date fails
+      continue;
+    }
+  }
 
   return {
     team: {
-      id: data.team?.id,
-      name: data.team?.displayName,
-      abbreviation: data.team?.abbreviation,
-      location: data.team?.location,
-      color: data.team?.color,
-      logos: data.team?.logos?.map((l: any) => l.href),
-      standingSummary: data.team?.standingSummary,
+      id: teamData.team?.id,
+      name: teamData.team?.displayName,
+      abbreviation: teamData.team?.abbreviation,
+      location: teamData.team?.location,
+      color: teamData.team?.color,
+      logos: teamData.team?.logos?.map((l: any) => l.href),
+      standingSummary: teamData.team?.standingSummary,
     },
     upcomingFixtures,
   };
