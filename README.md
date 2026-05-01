@@ -10,6 +10,7 @@ Access to top soccer leagues and international tournaments:
 - **Bundesliga** (Germany)
 - **Serie A** (Italy)
 - **Ligue 1** (France)
+- **Scottish Premiership** (Scotland)
 - **Champions League** (UEFA)
 - **Europa League** (UEFA)
 - **FIFA World Cup**
@@ -108,6 +109,7 @@ Get latest news for a league.
 | Bundesliga | `bundesliga` | `ger.1` |
 | Serie A | `serie-a` | `ita.1` |
 | Ligue 1 | `ligue-1` | `fra.1` |
+| Scottish Premiership | `scottish-premiership` | `sco.1` |
 | Champions League | `champions-league` | `uefa.champions` |
 | Europa League | `europa-league` | `uefa.europa` |
 | FIFA World Cup | `world-cup` | `fifa.world` |

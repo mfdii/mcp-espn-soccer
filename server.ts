@@ -18,6 +18,7 @@ const LEAGUES = {
   'bundesliga': { id: 'ger.1', name: 'German Bundesliga' },
   'serie-a': { id: 'ita.1', name: 'Italian Serie A' },
   'ligue-1': { id: 'fra.1', name: 'French Ligue 1' },
+  'scottish-premiership': { id: 'sco.1', name: 'Scottish Premiership' },
   'champions-league': { id: 'uefa.champions', name: 'UEFA Champions League' },
   'europa-league': { id: 'uefa.europa', name: 'UEFA Europa League' },
   'world-cup': { id: 'fifa.world', name: 'FIFA World Cup' },
