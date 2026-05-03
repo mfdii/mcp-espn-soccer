@@ -125,7 +125,6 @@ Deployed to OpenShift in the `n8n` namespace:
 ### Deploy to OpenShift
 
 ```bash
-cd .
 ./deploy.sh
 ```
 
