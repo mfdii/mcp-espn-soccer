@@ -27,7 +27,7 @@ const LEAGUES = {
 const tools = [
   {
     name: 'get-scoreboard',
-    description: 'Get current scores and fixtures for a soccer league or tournament. Returns live scores, upcoming matches, recent results, TV broadcast channels, and betting odds (over/under for match excitement assessment).',
+    description: 'Get LEAGUE-WIDE scores and fixtures. Use this for general queries about what matches are happening across the league/tournament, NOT for specific team schedules. Returns live scores, upcoming matches, recent results, TV broadcast channels, and betting odds (over/under for match excitement assessment).',
     inputSchema: {
       type: 'object',
       properties: {
@@ -88,7 +88,7 @@ const tools = [
   },
   {
     name: 'get-team-info',
-    description: 'Get information about a specific team including upcoming fixtures and team metadata. Returns next scheduled matches with dates, opponents, venues, and broadcast channels.',
+    description: 'Get TEAM-SPECIFIC fixtures and info. Use this when the query mentions a specific team name (Arsenal, Liverpool, etc.) or asks about "next X matches" for a team. Returns next scheduled matches with dates, opponents, venues, and broadcast channels.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -394,10 +394,17 @@ function log(level: string, event: string, data: any = {}) {
   process.stderr.write(JSON.stringify({ timestamp: new Date().toISOString(), level, event, ...data }) + '\n');
 }
 
+interface Session {
+  server: Server;
+  transport: StreamableHTTPServerTransport;
+  lastActivity: number;
+}
+
 class ESPNSoccerMCPServer {
-  private sessionServers = new Map();
+  private sessionServers = new Map<string, Session>();
   private static SESSION_TTL_MS = 3600000;
   private static MAX_SESSIONS = 100;
+  private cleanupInterval?: NodeJS.Timeout;
 
   private createServer(): Server {
     const server = new Server(
@@ -453,6 +460,41 @@ class ESPNSoccerMCPServer {
     });
 
     return server;
+  }
+
+  private cleanupSessions(): void {
+    const now = Date.now();
+    const expired: string[] = [];
+
+    for (const [sessionId, session] of this.sessionServers.entries()) {
+      if (now - session.lastActivity > ESPNSoccerMCPServer.SESSION_TTL_MS) {
+        expired.push(sessionId);
+      }
+    }
+
+    for (const sessionId of expired) {
+      const session = this.sessionServers.get(sessionId);
+      if (session) {
+        session.server.close().catch((err) => {
+          log('error', 'session_cleanup_error', {
+            session_id: sessionId.substring(0, 8),
+            error: err.message
+          });
+        });
+        this.sessionServers.delete(sessionId);
+        log('info', 'session_expired', {
+          session_id: sessionId.substring(0, 8),
+          idle_time_ms: now - session.lastActivity
+        });
+      }
+    }
+
+    if (expired.length > 0) {
+      log('info', 'session_cleanup_complete', {
+        expired_count: expired.length,
+        active_sessions: this.sessionServers.size
+      });
+    }
   }
 
   async run() {
@@ -522,6 +564,43 @@ class ESPNSoccerMCPServer {
 
     const port = parseInt(process.env.PORT || '8080', 10);
     app.listen(port, () => log('info', 'server_start', { port }));
+
+    // Start session cleanup interval
+    this.cleanupInterval = setInterval(() => this.cleanupSessions(), 60000);
+    log('info', 'session_cleanup_enabled', {
+      interval_ms: 60000,
+      ttl_ms: ESPNSoccerMCPServer.SESSION_TTL_MS
+    });
+
+    // Graceful shutdown
+    const shutdown = async () => {
+      log('info', 'shutdown_initiated', { active_sessions: this.sessionServers.size });
+
+      // Stop accepting new sessions
+      if (this.cleanupInterval) {
+        clearInterval(this.cleanupInterval);
+      }
+
+      // Close all active sessions
+      for (const [sessionId, session] of this.sessionServers.entries()) {
+        try {
+          await session.server.close();
+          log('info', 'session_closed_on_shutdown', { session_id: sessionId.substring(0, 8) });
+        } catch (err: any) {
+          log('error', 'shutdown_error', {
+            session_id: sessionId.substring(0, 8),
+            error: err.message
+          });
+        }
+      }
+
+      this.sessionServers.clear();
+      log('info', 'shutdown_complete');
+      process.exit(0);
+    };
+
+    process.on('SIGTERM', shutdown);
+    process.on('SIGINT', shutdown);
   }
 }
 
