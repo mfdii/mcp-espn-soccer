@@ -6,6 +6,10 @@ metadata:
   namespace: n8n
   labels:
     app: espn-soccer
+  annotations:
+    image.openshift.io/triggers: >-
+      [{"from":{"kind":"ImageStreamTag","name":"espn-soccer:latest","namespace":"n8n"},
+        "fieldPath":"spec.template.spec.containers[?(@.name==\"espn-soccer\")].image"}]
 spec:
   replicas: 1
   selector:
@@ -36,11 +40,17 @@ spec:
           limits:
             cpu: 500m
             memory: 256Mi
+        startupProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          failureThreshold: 12
         livenessProbe:
           httpGet:
             path: /health
             port: 8080
-          initialDelaySeconds: 30
           periodSeconds: 10
           timeoutSeconds: 3
           failureThreshold: 3
@@ -48,7 +58,13 @@ spec:
           httpGet:
             path: /ready
             port: 8080
-          initialDelaySeconds: 5
           periodSeconds: 10
           timeoutSeconds: 3
           failureThreshold: 3
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop: [ALL]
+          runAsNonRoot: true
+          seccompProfile:
+            type: RuntimeDefault
