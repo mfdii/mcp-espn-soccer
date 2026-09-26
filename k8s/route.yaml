@@ -3,7 +3,6 @@ apiVersion: route.openshift.io/v1
 kind: Route
 metadata:
   name: espn-soccer
-  namespace: n8n
   labels:
     app: espn-soccer
 spec:

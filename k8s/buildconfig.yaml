@@ -3,7 +3,6 @@ apiVersion: build.openshift.io/v1
 kind: BuildConfig
 metadata:
   name: espn-soccer
-  namespace: n8n
   labels:
     app: espn-soccer
 spec:

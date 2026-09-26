@@ -3,12 +3,11 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: espn-soccer
-  namespace: n8n
   labels:
     app: espn-soccer
   annotations:
     image.openshift.io/triggers: >-
-      [{"from":{"kind":"ImageStreamTag","name":"espn-soccer:latest","namespace":"n8n"},
+      [{"from":{"kind":"ImageStreamTag","name":"espn-soccer:latest"},
         "fieldPath":"spec.template.spec.containers[?(@.name==\"espn-soccer\")].image"}]
 spec:
   replicas: 1
@@ -22,7 +21,7 @@ spec:
     spec:
       containers:
       - name: espn-soccer
-        image: image-registry.openshift-image-registry.svc:5000/n8n/espn-soccer:latest
+        image: " "
         ports:
         - containerPort: 8080
           protocol: TCP
