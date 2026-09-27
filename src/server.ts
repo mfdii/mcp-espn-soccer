@@ -2,6 +2,7 @@ import express from 'express';
 import { McpServer, createMcpHandler } from '@modelcontextprotocol/server';
 import { toNodeHandler } from '@modelcontextprotocol/node';
 import { z } from 'zod';
+import { withMetrics, httpMetrics, getMetrics } from './metrics.js';
 
 const LEAGUES = {
   'premier-league': { id: 'eng.1', name: 'English Premier League' },
@@ -252,14 +253,14 @@ const handler = createMcpHandler(() => {
       date: z.string().describe('Optional date in YYYYMMDD format').optional(),
       limit: z.number().describe('Maximum number of matches to return (default: 10, max: 20)').optional(),
     },
-  }, async ({ league, date, limit }) => {
+  }, withMetrics('get-scoreboard', async ({ league, date, limit }) => {
     try {
       return toolResult(await getScoreboard(league, date, limit));
     } catch (error) {
       log('error', 'tool_error', { tool: 'get-scoreboard', error: String(error) });
       return toolError(error);
     }
-  });
+  }));
 
   server.registerTool('get-match-summary', {
     description: 'Get detailed summary of a specific match including lineups, statistics, and events.',
@@ -267,14 +268,14 @@ const handler = createMcpHandler(() => {
       league: leagueSchema.describe('League identifier'),
       eventId: z.string().describe('Match/event ID from scoreboard'),
     },
-  }, async ({ league, eventId }) => {
+  }, withMetrics('get-match-summary', async ({ league, eventId }) => {
     try {
       return toolResult(await getMatchSummary(league, eventId));
     } catch (error) {
       log('error', 'tool_error', { tool: 'get-match-summary', error: String(error) });
       return toolError(error);
     }
-  });
+  }));
 
   server.registerTool('get-league-news', {
     description: 'Get latest news for a soccer league or tournament.',
@@ -282,14 +283,14 @@ const handler = createMcpHandler(() => {
       league: leagueSchema.describe('League identifier'),
       limit: z.number().describe('Maximum number of news articles to return (default: 10)').optional(),
     },
-  }, async ({ league, limit }) => {
+  }, withMetrics('get-league-news', async ({ league, limit }) => {
     try {
       return toolResult(await getLeagueNews(league, limit));
     } catch (error) {
       log('error', 'tool_error', { tool: 'get-league-news', error: String(error) });
       return toolError(error);
     }
-  });
+  }));
 
   server.registerTool('get-team-info', {
     description: 'Get TEAM-SPECIFIC fixtures and info. Use this when the query mentions a specific team name (Arsenal, Liverpool, etc.) or asks about "next X matches" for a team. Returns next scheduled matches with dates, opponents, venues, and broadcast channels.',
@@ -298,54 +299,55 @@ const handler = createMcpHandler(() => {
       teamId: z.string().describe('Team ID or team name (e.g., "359" or "Arsenal")'),
       limit: z.number().describe('Maximum number of upcoming fixtures to return (default: 5, max: 10)').optional(),
     },
-  }, async ({ league, teamId, limit }) => {
+  }, withMetrics('get-team-info', async ({ league, teamId, limit }) => {
     try {
       return toolResult(await getTeamInfo(league, teamId, limit));
     } catch (error) {
       log('error', 'tool_error', { tool: 'get-team-info', error: String(error) });
       return toolError(error);
     }
-  });
+  }));
 
   server.registerTool('get-teams', {
     description: 'Get all teams in a soccer league or tournament.',
     inputSchema: {
       league: leagueSchema.describe('League identifier'),
     },
-  }, async ({ league }) => {
+  }, withMetrics('get-teams', async ({ league }) => {
     try {
       return toolResult(await getTeams(league));
     } catch (error) {
       log('error', 'tool_error', { tool: 'get-teams', error: String(error) });
       return toolError(error);
     }
-  });
+  }));
 
   server.registerTool('list-leagues', {
     description: 'List all available soccer leagues and tournaments.',
     inputSchema: {},
-  }, async () => {
+  }, withMetrics('list-leagues', async () => {
     return toolResult(listLeagues());
-  });
+  }));
 
   server.registerTool('get-standings', {
     description: 'Get current league table/standings showing team positions. Use to identify title races, relegation battles, and European qualification spots.',
     inputSchema: {
       league: leagueSchema.describe('League identifier'),
     },
-  }, async ({ league }) => {
+  }, withMetrics('get-standings', async ({ league }) => {
     try {
       return toolResult(await getStandings(league));
     } catch (error) {
       log('error', 'tool_error', { tool: 'get-standings', error: String(error) });
       return toolError(error);
     }
-  });
+  }));
 
   return server;
 });
 
 const app = express();
+app.use(httpMetrics);
 
 app.get('/health', (_req, res) => {
   res.status(200).json({ status: 'ok', service: 'espn-soccer' });
@@ -353,6 +355,12 @@ app.get('/health', (_req, res) => {
 
 app.get('/ready', (_req, res) => {
   res.status(200).json({ status: 'ready', service: 'espn-soccer' });
+});
+
+app.get('/metrics', async (_req, res) => {
+  const { contentType, metrics } = await getMetrics();
+  res.set('Content-Type', contentType);
+  res.status(200).send(metrics);
 });
 
 const nodeHandler = toNodeHandler(handler);

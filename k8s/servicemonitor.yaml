@@ -1,0 +1,16 @@
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: espn-soccer
+  labels:
+    app: espn-soccer
+spec:
+  selector:
+    matchLabels:
+      app: espn-soccer
+  endpoints:
+  - port: http
+    path: /metrics
+    interval: 30s
+    scrapeTimeout: 10s
